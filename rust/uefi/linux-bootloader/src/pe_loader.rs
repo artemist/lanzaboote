@@ -12,9 +12,7 @@ use uefi::{
     Handle, Status,
 };
 
-/// UEFI mandates 4 KiB pages.
-const UEFI_PAGE_BITS: usize = 12;
-const UEFI_PAGE_MASK: usize = (1 << UEFI_PAGE_BITS) - 1;
+use crate::uefi_helpers::bytes_to_pages;
 
 #[cfg(target_arch = "aarch64")]
 fn make_instruction_cache_coherent(memory: &[u8]) {
@@ -71,14 +69,6 @@ fn make_instruction_cache_coherent(_memory: &[u8]) {
 pub struct Image {
     image: &'static mut [u8],
     entry: extern "efiapi" fn(Handle, SystemTable<Boot>) -> Status,
-}
-
-/// Converts a length in bytes to the number of required pages.
-fn bytes_to_pages(bytes: usize) -> usize {
-    bytes
-        .checked_add(UEFI_PAGE_MASK)
-        .map(|rounded_up| rounded_up >> UEFI_PAGE_BITS)
-        .unwrap_or(1 << (usize::try_from(usize::BITS).unwrap() - UEFI_PAGE_BITS))
 }
 
 impl Image {

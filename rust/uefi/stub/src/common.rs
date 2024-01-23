@@ -5,6 +5,7 @@ use uefi::{
     CString16, Result,
 };
 
+use linux_bootloader::fdt_loader::FdtLoader;
 use linux_bootloader::linux_loader::InitrdLoader;
 use linux_bootloader::pe_loader::Image;
 use linux_bootloader::pe_section::pe_section_as_string;
@@ -90,14 +91,30 @@ pub fn boot_linux_unchecked(
     kernel_data: Vec<u8>,
     kernel_cmdline: &[u8],
     initrd_data: Vec<u8>,
+    maybe_fdt_data: Option<Vec<u8>>,
 ) -> uefi::Result<()> {
     let kernel =
         Image::load(system_table.boot_services(), &kernel_data).expect("Failed to load the kernel");
 
     let mut initrd_loader = InitrdLoader::new(system_table.boot_services(), handle, initrd_data)?;
 
+    let maybe_fdt_loader = if let Some(fdt_data) = maybe_fdt_data {
+        Some(FdtLoader::new(
+            system_table.boot_services(),
+            handle,
+            fdt_data,
+        )?)
+    } else {
+        None
+    };
+
     let status = unsafe { kernel.start(handle, &system_table, kernel_cmdline) };
 
     initrd_loader.uninstall(system_table.boot_services())?;
+
+    if let Some(mut fdt_loader) = maybe_fdt_loader {
+        fdt_loader.uninstall(system_table.boot_services())?;
+    }
+
     status.to_result()
 }

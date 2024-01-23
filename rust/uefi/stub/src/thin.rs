@@ -29,6 +29,14 @@ struct EmbeddedConfiguration {
     /// over the whole PE binary, not only the embedded initrd.
     initrd_hash: Hash,
 
+    /// The filename of the flattened device tree to pass to be passed
+    /// to the kernel. See `kernel_filename` for how to interpret this
+    /// filename.
+    fdt_filename: Option<CString16>,
+
+    /// The cryptographic hash of the flattened device tree.
+    fdt_hash: Option<Hash>,
+
     /// The kernel command-line.
     cmdline: CString16,
 }
@@ -51,6 +59,9 @@ impl EmbeddedConfiguration {
 
             initrd_filename: extract_string(file_data, ".initrdp")?,
             initrd_hash: extract_hash(file_data, ".initrdh")?,
+
+            fdt_filename: extract_string(file_data, ".dtbp").ok(),
+            fdt_hash: extract_hash(file_data, ".dtbh").ok(),
 
             cmdline: extract_string(file_data, ".cmdline")?,
         })
@@ -95,6 +106,7 @@ pub fn boot_linux(handle: Handle, mut system_table: SystemTable<Boot>) -> uefi::
 
     let kernel_data;
     let initrd_data;
+    let maybe_fdt_data;
 
     {
         let file_system = system_table
@@ -109,6 +121,11 @@ pub fn boot_linux(handle: Handle, mut system_table: SystemTable<Boot>) -> uefi::
         initrd_data = file_system
             .read(&*config.initrd_filename)
             .expect("Failed to read initrd file into memory");
+        maybe_fdt_data = config.fdt_filename.map(|fdt_filename| {
+            file_system
+                .read(&*fdt_filename)
+                .expect("Failed to read device tree file into memory")
+        });
     }
 
     let cmdline = get_cmdline(
@@ -129,6 +146,20 @@ pub fn boot_linux(handle: Handle, mut system_table: SystemTable<Boot>) -> uefi::
         "Initrd",
         secure_boot_enabled,
     )?;
+    if let Some(ref fdt_data) = maybe_fdt_data {
+        if let Some(fdt_hash) = config.fdt_hash {
+            check_hash(fdt_data, fdt_hash, "Device Tree", secure_boot_enabled)?;
+        } else {
+            panic!("Found device tree but no hash");
+        }
+    }
 
-    boot_linux_unchecked(handle, system_table, kernel_data, &cmdline, initrd_data)
+    boot_linux_unchecked(
+        handle,
+        system_table,
+        kernel_data,
+        &cmdline,
+        initrd_data,
+        maybe_fdt_data,
+    )
 }

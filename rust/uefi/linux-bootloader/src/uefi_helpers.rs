@@ -35,3 +35,15 @@ pub fn booted_image_file(boot_services: &BootServices) -> Result<PeInMemory> {
         image_size: usize::try_from(image_size).map_err(|_| uefi::Status::INVALID_PARAMETER)?,
     })
 }
+
+/// UEFI mandates 4 KiB pages.                                                                                          
+pub const UEFI_PAGE_BITS: usize = 12;
+pub const UEFI_PAGE_MASK: usize = (1 << UEFI_PAGE_BITS) - 1;
+
+/// Converts a length in bytes to the number of required pages.                                                         
+pub fn bytes_to_pages(bytes: usize) -> usize {
+    bytes
+        .checked_add(UEFI_PAGE_MASK)
+        .map(|rounded_up| rounded_up >> UEFI_PAGE_BITS)
+        .unwrap_or(1 << (usize::try_from(usize::BITS).unwrap() - UEFI_PAGE_BITS))
+}

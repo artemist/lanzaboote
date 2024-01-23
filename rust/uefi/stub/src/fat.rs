@@ -27,6 +27,9 @@ struct EmbeddedConfiguration {
 
     /// The initrd as raw bytes.
     initrd: Vec<u8>,
+
+    /// The flattened device tree as raw bytes.
+    fdt: Vec<u8>,
 }
 
 impl EmbeddedConfiguration {
@@ -35,6 +38,7 @@ impl EmbeddedConfiguration {
             kernel: extract_bytes(file_data, ".linux")?,
             initrd: extract_bytes(file_data, ".initrd")?,
             cmdline: extract_string(file_data, ".cmdline")?,
+            fdt: extract_bytes(file_data, ".dtb").ok(),
         })
     }
 }
@@ -62,5 +66,13 @@ pub fn boot_linux(handle: Handle, mut system_table: SystemTable<Boot>) -> Status
         secure_boot_enabled,
     );
 
-    boot_linux_unchecked(handle, system_table, config.kernel, &cmdline, config.initrd).status()
+    boot_linux_unchecked(
+        handle,
+        system_table,
+        config.kernel,
+        &cmdline,
+        config.initrd,
+        config.fdt,
+    )
+    .status()
 }

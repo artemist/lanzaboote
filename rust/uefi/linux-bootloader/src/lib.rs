@@ -3,6 +3,7 @@
 extern crate alloc;
 
 pub mod efivars;
+pub mod fdt_loader;
 pub mod linux_loader;
 pub mod measure;
 pub mod pe_loader;
